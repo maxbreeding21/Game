@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Ultra Lucky Button</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111111">
+
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background:#111;
+    color:white;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    margin:0;
+    text-align:center;
+}
+
+.container{
+    background:#1e1e1e;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 0 20px rgba(0,0,0,.6);
+    width:380px;
+}
+
+button{
+    font-size:22px;
+    padding:18px 30px;
+    border:none;
+    border-radius:8px;
+    cursor:pointer;
+    background:#4CAF50;
+    color:white;
+}
+
+button:active{
+    transform:scale(.96);
+}
+
+.stat{
+    margin-top:12px;
+    opacity:.9;
+}
+
+.win{
+    color:gold;
+    font-size:24px;
+    font-weight:bold;
+}
+
+.small{
+    font-size:14px;
+    opacity:.7;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+<h1>🎲 Ultra Lucky Button</h1>
+
+<button id="clickButton">CLICK</button>
+
+<div id="attempts" class="stat">Attempts: 0</div>
+<div id="odds" class="stat">Chance you would've won by now: 0%</div>
+<div id="result" class="stat">Good luck...</div>
+
+<div class="small">Installable App • Attempts Auto-Saved</div>
+</div>
+
+<script>
+// ---------- SETTINGS ----------
+const WIN_CHANCE = 10n ** 19n; // 1 in 10 quintillion
+const STORAGE_KEY = "ultraLuckyAttempts";
+
+// ---------- LOAD SAVE ----------
+let attempts = Number(localStorage.getItem(STORAGE_KEY)) || 0;
+
+const button = document.getElementById("clickButton");
+const attemptsText = document.getElementById("attempts");
+const oddsText = document.getElementById("odds");
+const resultText = document.getElementById("result");
+
+updateDisplay();
+
+// ---------- SECURE RANDOM ----------
+function randomBigInt(maxExclusive){
+    const bytes = 8;
+    let rand;
+
+    do{
+        const array = new Uint8Array(bytes);
+        crypto.getRandomValues(array);
+
+        rand = 0n;
+        for(let i=0;i<array.length;i++){
+            rand = (rand<<8n)+BigInt(array[i]);
+        }
+    }while(rand >= (1n<<64n)-((1n<<64n)%maxExclusive));
+
+    return rand % maxExclusive;
+}
+
+// ---------- DISPLAY ----------
+function updateDisplay(){
+    attemptsText.textContent = "Attempts: " + attempts;
+
+    const p = 1 / Number(WIN_CHANCE);
+    const probability = 1 - Math.pow(1 - p, attempts);
+
+    let percent;
+    if(probability === 0){
+        percent = "≈ 0%";
+    } else if(probability < 0.000001){
+        percent = probability.toExponential(2)+" %";
+    } else{
+        percent = (probability*100).toFixed(8)+"%";
+    }
+
+    oddsText.textContent =
+      "Chance you would've won by now: " + percent;
+}
+
+// ---------- CLICK ----------
+button.addEventListener("click",()=>{
+
+    attempts++;
+    localStorage.setItem(STORAGE_KEY, attempts);
+
+    const roll = randomBigInt(WIN_CHANCE);
+
+    if(roll === 0n){
+        resultText.innerHTML =
+        '<div class="win">🏆 YOU WON!!!<br>1 IN 10 QUINTILLION HIT!</div>';
+
+        button.disabled = true;
+        localStorage.removeItem(STORAGE_KEY);
+        return;
+    }
+
+    resultText.textContent = "Not this time...";
+    updateDisplay();
+});
+
+// ---------- SERVICE WORKER ----------
+if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
