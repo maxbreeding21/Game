@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+content="width=device-width,
+initial-scale=1.0,
+maximum-scale=1.0,
+user-scalable=no">
+
+<title>1 in X Game</title>
+
+<style>
+body{
+  font-family:Arial,sans-serif;
+  text-align:center;
+  margin:0;
+  background:#f0f0f0;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+h1{margin-top:40px;}
+
+#tryButton{
+  padding:18px 35px;
+  font-size:20px;
+  margin-top:30px;
+  border:none;
+  border-radius:10px;
+  background:#2f7cff;
+  color:white;
+  -webkit-tap-highlight-color:transparent;
+}
+
+#tryButton:active{
+  transform:scale(0.96);
+}
+
+/* NEW restart button style */
+#restartButton{
+  padding:12px 22px;
+  font-size:16px;
+  margin-top:15px;
+  border:none;
+  border-radius:8px;
+  background:#ff5252;
+  color:white;
+}
+
+.info{
+  margin-top:15px;
+  font-size:18px;
+  color:#555;
+}
+
+#resultDisplay{
+  font-size:26px;
+  font-weight:bold;
+  color:green;
+  height:45px;
+}
+
+canvas{
+  position:fixed;
+  top:0;
+  left:0;
+  pointer-events:none;
+}
+</style>
+</head>
+
+<body>
+
+<h1>1 in X Game</h1>
+
+<button id="tryButton">Click Fast!</button>
+
+<!-- ✅ NEW MANUAL RESTART BUTTON -->
+<br>
+<button id="restartButton">Restart This Mode</button>
+
+<div class="info" id="attemptsCounter"></div>
+<div class="info" id="oddsDisplay"></div>
+<div class="info" id="percentDisplay"></div>
+
+<div class="info">
+Game Difficulty: <span id="gameLabel"></span><br>
+<input type="range" id="gameSlider" min="0" max="9" step="1">
+</div>
+
+<div class="info">
+Auto Click Speed:
+<span id="speedLabel"></span> CPS<br>
+<input type="range" id="speedSlider"
+min="0" max="1000" step="1" value="333">
+</div>
+
+<div id="resultDisplay"></div>
+
+<canvas id="confettiCanvas"></canvas>
+
+<script>
+// ---------- PREVENT ZOOM ----------
+window.addEventListener('gesturestart',e=>e.preventDefault());
+
+// ---------- ELEMENTS ----------
+const button=document.getElementById('tryButton');
+const restartButton=document.getElementById('restartButton');
+
+const attemptsCounter=document.getElementById('attemptsCounter');
+const oddsDisplay=document.getElementById('oddsDisplay');
+const percentDisplay=document.getElementById('percentDisplay');
+const resultDisplay=document.getElementById('resultDisplay');
+
+const speedSlider=document.getElementById('speedSlider');
+const speedLabel=document.getElementById('speedLabel');
+
+const gameSlider=document.getElementById("gameSlider");
+const gameLabel=document.getElementById("gameLabel");
+
+// ---------- DIFFICULTIES ----------
+const games = Array.from({length:10}, (_,i)=>({
+  name:"1 in " + (10**(i+1)).toLocaleString(),
+  odds:10**(i+1)
+}));
+
+let currentGameIndex =
+  parseInt(localStorage.getItem("selectedGame"))||6;
+
+gameSlider.value=currentGameIndex;
+
+let oddsPerTry=games[currentGameIndex].odds;
+gameLabel.textContent=games[currentGameIndex].name;
+
+// ---------- SAVE SYSTEM ----------
+function getSaveKey(){
+  return "millionGameAttempts_"+currentGameIndex;
+}
+
+let attempts=parseInt(localStorage.getItem(getSaveKey()))||0;
+
+// ---------- STATS ----------
+function updateStats(){
+
+  const probability=
+    1-Math.pow((oddsPerTry-1)/oddsPerTry,attempts);
+
+  const percent=probability*100;
+
+  const equivalentOdds=
+    probability>0?Math.round(1/probability):oddsPerTry;
+
+  attemptsCounter.textContent=
+    "Attempts: "+attempts.toLocaleString();
+
+  oddsDisplay.textContent=
+    "Current Odds: 1 in "+equivalentOdds.toLocaleString();
+
+  percentDisplay.textContent=
+    "Win Chance: "+percent.toFixed(6)+"%";
+
+  localStorage.setItem(getSaveKey(),attempts);
+}
+
+// ---------- MANUAL RESTART (NEW) ----------
+restartButton.addEventListener("click",()=>{
+
+  attempts=0;
+  localStorage.setItem(getSaveKey(),0);
+
+  resultDisplay.textContent="";
+
+  updateStats();
+});
+
+// ---------- CONFETTI ----------
+const canvas=document.getElementById('confettiCanvas');
+const ctx=canvas.getContext('2d');
+
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let confetti=[];
+
+function createConfetti(){
+  for(let i=0;i<180;i++){
+    confetti.push({
+      x:Math.random()*canvas.width,
+      y:Math.random()*canvas.height-canvas.height,
+      r:Math.random()*6+4,
+      color:`hsl(${Math.random()*360},100%,50%)`,
+      tilt:Math.random()*10-10,
+      tiltAngle:0,
+      tiltSpeed:Math.random()*0.07+0.05
+    });
+  }
+}
+
+function drawConfetti(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  confetti.forEach((p,i)=>{
+    ctx.beginPath();
+    ctx.lineWidth=p.r/2;
+    ctx.strokeStyle=p.color;
+    ctx.moveTo(p.x+p.tilt,p.y);
+    ctx.lineTo(p.x+p.tilt,p.y+p.r);
+    ctx.stroke();
+
+    p.tiltAngle+=p.tiltSpeed;
+    p.y+=3+p.r/2;
+    p.tilt=Math.sin(p.tiltAngle)*15;
+
+    if(p.y>canvas.height) confetti.splice(i,1);
+  });
+
+  if(confetti.length>0) requestAnimationFrame(drawConfetti);
+}
+
+function launchConfetti(){
+  createConfetti();
+  drawConfetti();
+}
+
+// ---------- ATTEMPT ----------
+function doAttempt(){
+
+  attempts++;
+
+  const roll=Math.floor(Math.random()*oddsPerTry)+1;
+
+  if(roll===1){
+
+    const winningAttempt=attempts;
+
+    resultDisplay.textContent =
+      "🎉 YOU WON on Attempt #" +
+      winningAttempt.toLocaleString() +
+      "! 🎉";
+
+    launchConfetti();
+
+    attempts=0;
+    localStorage.setItem(getSaveKey(),0);
+  }
+
+  updateStats();
+}
+
+// ---------- LOG SCALE CPS ----------
+let clicksPerSecond=10;
+
+function sliderToCPS(v){
+  const min=Math.log10(1);
+  const max=Math.log10(10000);
+  const scale=v/1000;
+  return Math.round(10**(min+(max-min)*scale));
+}
+
+function updateCPS(){
+  clicksPerSecond=sliderToCPS(speedSlider.value);
+  speedLabel.textContent=clicksPerSecond.toLocaleString();
+}
+
+speedSlider.addEventListener("input",updateCPS);
+updateCPS();
+
+// ---------- AUTO CLICK ENGINE ----------
+let clicking=false;
+let lastFrameTime=0;
+let accumulator=0;
+
+function autoLoop(timestamp){
+
+  if(!clicking) return;
+
+  if(!lastFrameTime) lastFrameTime=timestamp;
+
+  const delta=(timestamp-lastFrameTime)/1000;
+  lastFrameTime=timestamp;
+
+  accumulator+=clicksPerSecond*delta;
+
+  while(accumulator>=1){
+    doAttempt();
+    accumulator--;
+  }
+
+  requestAnimationFrame(autoLoop);
+}
+
+// HOLD
+button.addEventListener("pointerdown",(e)=>{
+  e.preventDefault();
+  clicking=true;
+  lastFrameTime=0;
+  requestAnimationFrame(autoLoop);
+});
+
+// RELEASE
+["pointerup","pointerleave","pointercancel"].forEach(evt=>{
+  button.addEventListener(evt,()=>clicking=false);
+});
+
+// SINGLE CLICK
+button.addEventListener("click",()=>{
+  if(!clicking) doAttempt();
+});
+
+// ---------- GAME SWITCH ----------
+gameSlider.addEventListener("input",()=>{
+
+  currentGameIndex=parseInt(gameSlider.value);
+  localStorage.setItem("selectedGame",currentGameIndex);
+
+  oddsPerTry=games[currentGameIndex].odds;
+  gameLabel.textContent=games[currentGameIndex].name;
+
+  attempts=parseInt(localStorage.getItem(getSaveKey()))||0;
+
+  resultDisplay.textContent="";
+
+  updateStats();
+});
+
+// ---------- INIT ----------
+updateStats();
+
+window.addEventListener('resize',()=>{
+  canvas.width=window.innerWidth;
+  canvas.height=window.innerHeight;
+});
+</script>
+
+</body>
+</html>
